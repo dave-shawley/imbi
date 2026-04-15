@@ -22,8 +22,8 @@ WORKDIR /tmp/build
 
 RUN pip install uv \
  && apt-get update \
- && apt-get install -y --no-install-recommends git \
- && rm -rf /var/lib/apt/lists/*
+ && apt-get -y --no-install-recommends git \
+ && apt-get -y gcc
 
 # Copy all service sources
 COPY imbi-common/ imbi-common/
@@ -34,16 +34,14 @@ COPY imbi-mcp/ imbi-mcp/
 
 # Build wheels for all services
 RUN for svc in imbi-common imbi-api imbi-assistant imbi-gateway imbi-mcp; do \
-      cd /tmp/build/$svc && uv build --wheel --out-dir /tmp/wheels/; \
-    done
+  uv build /tmp/build/$svc --wheel --out-dir /tmp/wheels/; \
+done
 
 # Install all services into a venv, then clean up source
-RUN uv venv --python $(which python3) /app \
- && ln -sf $(which python3) /app/bin/python3 \
- && . /app/bin/activate \
+ENV UV_LINK_MODE=copy UV_PROJECT_DIRECTORY=/app VIRTUAL_ENV=/app
+RUN uv venv --python $(which python3) $UV_PROJECT_DIRECTORY \
  && uv pip install /tmp/wheels/*.whl \
- && chmod -R a+rX /app \
- && rm -rf /tmp/build /tmp/wheels
+ && chmod -R a+rX /app
 
 # ---------------------------------------------------------------------------
 # Stage 3: Caddy binary
@@ -57,7 +55,7 @@ FROM python:${PYTHON_VERSION}-slim AS runtime
 
 # Install runtime dependencies
 RUN apt-get update \
- && apt-get install -y --no-install-recommends tini \
+ && apt-get -y --no-install-recommends tini \
  && rm -rf /var/lib/apt/lists/*
 
 # Create imbi user
